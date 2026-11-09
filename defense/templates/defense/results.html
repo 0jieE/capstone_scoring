@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% load static defense_extras %}
+{% block title %}Results · {{ defense.title|truncatechars:40 }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>{{ defense.title }}</h1>
+    <p class="meta">
+      <span>{{ defense.schedule_date|date:"F j, Y" }}{% if defense.schedule_time %}, {{ defense.schedule_time|time:"g:i A" }}{% endif %}</span>
+      {% if defense.venue %}<span>{{ defense.venue }}</span>{% endif %}
+      <span>Proponents: {% for p in result.proponents %}{{ p.full_name }}{% if not forloop.last %}, {% endif %}{% endfor %}</span>
+    </p>
+  </div>
+  <div class="head-actions">
+    {% if result.complete %}<a class="btn" href="{% url 'defense:print_results' defense.pk %}">Print summary</a>{% endif %}
+    {% if mine %}<a class="btn btn-ghost" href="{% url 'defense:evaluate' mine.pk %}">My form</a>{% endif %}
+  </div>
+</div>
+
+<section class="card" id="status-card"
+         data-status-url="{% url 'defense:results_status' defense.pk %}"
+         data-complete="{{ result.complete|yesno:'1,0' }}"
+         data-submitted="{{ result.submitted_count }}"
+         data-version="{{ scores_version }}">
+  <h2 class="card-title">Panel submissions <span class="chip {% if result.complete %}chip-ok{% elif result.submitted_count %}chip-warn{% else %}chip-muted{% endif %}" id="submitted-chip">{{ result.submitted_count }}/{{ result.total }} submitted</span></h2>
+  <ul class="status-list">
+    {% for row in result.rows %}
+    <li data-assignment="{{ row.assignment.pk }}">
+      <span class="role">{{ row.assignment.get_role_display }}</span>
+      <span class="name">{{ row.assignment.panelist.display_name }}</span>
+      <span class="chip {{ row.status|status_class }} status-chip">{{ row.status_label }}</span>
+      {% if is_manager %}
+        <span class="row-tools">
+          <a class="btn btn-small btn-ghost" href="{% url 'defense:print_form' row.assignment.pk %}">Form</a>
+          {% if row.submitted %}
+          <form method="post" action="{% url 'defense:evaluation_unlock' row.assignment.pk %}" class="inline"
+                onsubmit="return confirm('Return this evaluation to draft?
+
+It stops counting toward the result until the panelist submits it again.');">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <button type="submit" class="btn btn-small btn-ghost">Return to draft</button>
+          </form>
+          {% endif %}
+        </span>
+      {% endif %}
+    </li>
+    {% empty %}
+    <li class="muted">No panel assigned yet.</li>
+    {% endfor %}
+  </ul>
+  {% if not result.complete %}
+    <p class="muted small" id="waiting-note">Scores and the panel's decision appear here once all 3 panelists submit. This page refreshes on its own.</p>
+  {% endif %}
+  {% for note in result.notes %}<div class="msg msg-warning">{{ note }}</div>{% endfor %}
+</section>
+
+{% if result.complete %}
+{% with d=result.decision %}
+<section class="card consolidated">
+  <h2 class="card-title">Panel's decision for the group</h2>
+  <div class="consolidated-grid">
+    <div class="big-score">
+      <div class="verdict-big {{ d.verdict|verdict_class }}">{{ d.verdict_label }}</div>
+      <p class="decision-basis {% if not d.group.majority %}bad{% endif %}">{{ d.group.summary }}</p>
+      <ul class="vote-list">
+        {% for row in result.rows %}
+        <li><span class="vote-role">{{ row.assignment.get_role_display }}</span>
+          <strong>{{ row.score.final|fmt2 }}</strong>
+          <span class="verdict-pill small {{ row.score.verdict|verdict_class }}">{{ row.score.verdict|verdict_short }}</span></li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% include "defense/_decision.html" with selected=d.verdict %}
+  </div>
+  {% if not d.group.majority %}
+    <div class="msg msg-warning">The three panelists' results all differ, so there is no 2-of-3 agreement. The middle result is shown; the panel should confirm the decision.</div>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2 class="card-title">Per-student decision</h2>
+  <p class="muted small">A student's score from a panelist is A + B + that student's own oral defense score (C).</p>
+  <div class="table-wrap">
+  <table class="data-table">
+    <thead><tr><th>Student</th>{% for row in result.rows %}<th class="num">{{ row.assignment.panelist.display_name }}<div class="th-sub">{{ row.assignment.get_role_display }}</div></th>{% endfor %}<th>Decision</th></tr></thead>
+    <tbody>
+    {% for pd in d.proponents %}
+      <tr><td><strong>{{ pd.proponent.full_name }}</strong></td>
+        {% for ps in pd.scores %}<td class="num">{{ ps.final|fmt2 }} <span class="verdict-pill small {{ ps.verdict|verdict_class }}">{{ ps.verdict|verdict_short }}</span></td>{% endfor %}
+        <td><span class="verdict-pill small {{ pd.decision.verdict|verdict_class }}">{{ pd.decision.verdict_label }}</span>
+          <div class="small {% if pd.decision.majority %}muted{% else %}bad{% endif %}">{{ pd.decision.summary }}</div></td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section class="card">
+  <h2 class="card-title">Each panelist's scores</h2>
+  <div class="table-wrap">
+  <table class="data-table">
+    <thead><tr><th>Role</th><th>Panelist</th><th class="num">A (System)</th><th class="num">B (Manuscript)</th><th class="num">C (Oral)</th><th class="num">FINAL</th><th>Result</th><th>Submitted</th></tr></thead>
+    <tbody>
+    {% for row in result.rows %}
+      <tr><td>{{ row.assignment.get_role_display }}</td><td>{{ row.assignment.panelist.display_name }}</td>
+        <td class="num">{{ row.score.A|fmt2 }}</td><td class="num">{{ row.score.B|fmt2 }}</td><td class="num">{{ row.score.C|fmt2 }}</td>
+        <td class="num"><strong>{{ row.score.final|fmt2 }}</strong></td>
+        <td>{{ row.score.verdict_label }}</td>
+        <td class="small">{{ row.evaluation.submitted_at|date:"M j, g:i A" }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <p class="muted small table-note">{% if result.proponents|length > 1 %}C here is the average of the students' oral-defense scores (the single C on the paper form). {% endif %}No panelist is weighted more than another.</p>
+</section>
+
+<section class="card">
+  <h2 class="card-title">Required revisions / comments</h2>
+  {% for row in result.rows %}
+    <div class="comment-block">
+      <div class="comment-who">{{ row.assignment.panelist.display_name }} <span class="muted">{{ row.assignment.get_role_display }}</span></div>
+      <div class="comment-text">{{ row.evaluation.comments|default:"(no comments)"|linebreaksbr }}</div>
+    </div>
+  {% endfor %}
+</section>
+{% endwith %}
+{% endif %}
+{% endblock %}
+{% block scripts %}<script src="{% static 'js/results.js' %}"></script>{% endblock %}

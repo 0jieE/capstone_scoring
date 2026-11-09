@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Panelists · Capstone Defense Scoring{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Panelist accounts</h1>
+    <p class="muted">Examiners and coordinators who can sign in and score.</p>
+  </div>
+  <a class="btn btn-primary" href="{% url 'defense:panelist_create' %}">+ New panelist</a>
+</div>
+
+<div class="card">
+  <h2 class="card-title">Accounts <span class="chip chip-muted">{{ panelists|length }}</span></h2>
+  <div class="table-wrap">
+  <table class="data-table">
+    <thead><tr><th>Name</th><th>Username</th><th>Access</th><th>Status</th><th class="num">Panels</th><th></th></tr></thead>
+    <tbody>
+    {% for p in panelists %}
+      <tr class="{% if not p.user.is_active %}inactive{% endif %}">
+        <td>{{ p.display_name }}</td>
+        <td><code>{{ p.user.username }}</code></td>
+        <td>{% if p.user.is_staff %}<span class="chip chip-ok">Manager</span>{% else %}<span class="chip chip-muted">Panelist</span>{% endif %}</td>
+        <td>{% if p.user.is_active %}Active{% else %}Inactive{% endif %}</td>
+        <td class="num">{{ p.panel_count }}</td>
+        <td class="num row-actions">
+          <a class="btn btn-small btn-ghost" href="{% url 'defense:panelist_edit' p.pk %}">Edit</a>
+          {% if p.user_id != user.pk %}
+          <form method="post" action="{% url 'defense:panelist_delete' p.pk %}" class="inline"
+                onsubmit="return confirm('Delete the account of {{ p.display_name|escapejs }}?\n\nThis cannot be undone.');">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-small btn-danger"
+                    {% if p.panel_count %}title="On {{ p.panel_count }} panel{{ p.panel_count|pluralize }}: reassign or deactivate instead"{% endif %}>Delete</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="6" class="muted">No panelists yet.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <p class="muted small table-note">A panelist who is on a defense panel can't be deleted, because their scores would be lost. Reassign their role in that defense first, or untick <em>Active</em> under Edit to stop them signing in.</p>
+</div>
+{% endblock %}

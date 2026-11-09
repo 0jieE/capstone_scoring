@@ -1,0 +1,12 @@
+{# Panel's Decision boxes, styled like the paper form. Context: verdict_choices, selected (code or None) #}
+<div class="decision">
+  <div class="decision-title">PANEL'S DECISION</div>
+  {% for v in verdict_choices %}
+  <div class="decision-row{% if v.code == selected %} is-checked{% endif %}">
+    <span class="box" aria-hidden="true">{% if v.code == selected %}✓{% endif %}</span>
+    <span class="decision-label"><strong>{{ v.label }}</strong> <span class="muted">({{ v.range }})</span>
+      <span class="decision-note">{{ v.note }}</span></span>
+    {% if v.code == selected %}<span class="sr-only">(selected)</span>{% endif %}
+  </div>
+  {% endfor %}
+</div>

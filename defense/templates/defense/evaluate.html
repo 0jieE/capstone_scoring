@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% load static defense_extras %}
+{% block title %}Evaluate · {{ defense.title|truncatechars:40 }}{% endblock %}
+{% block body_class %}has-mobile-bar{% endblock %}
+{% block content %}
+<div class="form-sheet">
+  <div class="inst-block">
+    <div class="inst-name">{{ INSTITUTION.name }}</div>
+    <div class="inst-sub">{{ INSTITUTION.address }}</div>
+    <div class="inst-dept">{{ INSTITUTION.department }}</div>
+    <div class="form-title">{{ INSTITUTION.form_title }}</div>
+  </div>
+
+  <div class="fboxes">
+    <div class="fbox wide">
+      <div class="fbox-label">Project title</div>
+      <div class="fbox-body">{{ defense.title }}</div>
+    </div>
+    <div class="fbox">
+      <div class="fbox-label">Proponents</div>
+      <div class="fbox-body"><ol>{% for p in proponents %}<li>{{ p.full_name }}</li>{% endfor %}</ol></div>
+    </div>
+    <div class="fbox">
+      <div class="fbox-label">Panelists</div>
+      <div class="fbox-body"><ul class="panel-list">
+        {% for a in panel %}<li class="{% if a.pk == assignment.pk %}me{% endif %}">{{ a.panelist.display_name }}<span class="role-tag">{{ a.get_role_display }}{% if a.pk == assignment.pk %} (you){% endif %}</span></li>{% endfor %}
+      </ul></div>
+    </div>
+    <div class="fbox">
+      <div class="fbox-label">Schedule</div>
+      <div class="fbox-body">{{ defense.schedule_date|date:"F j, Y" }}{% if defense.schedule_time %}<br>{{ defense.schedule_time|time:"g:i A" }}{% endif %}{% if defense.venue %}<br>{{ defense.venue }}{% endif %}</div>
+    </div>
+  </div>
+</div>
+
+{% if was_submitted and not locked %}
+  <div class="msg msg-success">
+    You submitted this evaluation{% if evaluation.submitted_at %} on {{ evaluation.submitted_at|date:"M j, Y g:i A" }}{% endif %}.
+    You can still change your ratings and comments until the Research Coordinator closes scoring.
+    <div class="msg-links"><a href="{% url 'defense:results' defense.pk %}">View status and results</a>
+    <a href="{% url 'defense:print_form' assignment.pk %}">Print my form</a></div>
+  </div>
+{% elif locked_reason == "closed" %}
+  <div class="msg msg-warning">Scoring for this defense is closed. Your form is read-only.
+    {% if was_submitted %}<div class="msg-links"><a href="{% url 'defense:results' defense.pk %}">View status and results</a>
+    <a href="{% url 'defense:print_form' assignment.pk %}">Print my form</a></div>{% endif %}</div>
+{% endif %}
+
+{% if form.non_field_errors %}
+  <div class="msg msg-error">{% for e in form.non_field_errors %}{{ e }}{% endfor %}</div>
+{% endif %}
+
+<p class="muted small scale-note no-print">Rate each item from 5 (Excellence) down to 1 (Poor). Each rating is multiplied by the item's weight.
+  {% if not locked %}Tap a box to rate; your totals update as you go.{% endif %}</p>
+
+<form method="post" id="eval-form" class="eval-layout{% if locked %} is-locked{% endif %}"
+      data-cutoffs="{{ cutoffs.0 }},{{ cutoffs.1 }},{{ cutoffs.2 }}"
+      data-proponents="{% for p in proponents %}{{ p.pk }}{% if not forloop.last %},{% endif %}{% endfor %}">
+  {% csrf_token %}
+  <div class="eval-main">
+    {% for sec in sections %}
+    <section class="section-block">
+      <h2 class="section-title">{{ sec.label }} <span class="section-weight">{{ sec.weight_percent|pct }}%</span></h2>
+      {% for item in sec.criteria %}
+      {% with c=item.criterion %}
+      <div class="criterion" data-criterion="{{ c.pk }}" data-section="{{ c.section }}" data-weight="{{ c.weight }}" data-per-proponent="{{ c.per_proponent|yesno:'1,0' }}">
+        <div class="criterion-head">
+          <h3><span class="crit-no">{{ c.number }}.</span> {{ c.name }}</h3>
+          <span class="crit-weight">{{ c.weight_percent|pct }}%{% if c.per_proponent %} <span class="per">for each proponent</span>{% endif %}</span>
+        </div>
+        {% if c.guide_question %}<p class="guide">{{ c.guide_question }}</p>{% endif %}
+        <details class="descriptors" {% if not locked %}open{% endif %}>
+          <summary>Rating guide</summary>
+          <dl>
+            {% for s in c.scale %}<div class="desc"><dt>{{ s.label }} ({{ s.n }})</dt><dd>{{ s.text }}</dd></div>{% endfor %}
+          </dl>
+        </details>
+        {% for row in item.rows %}
+        <fieldset class="rating-row{% if row.value == '' %} unrated{% endif %}" data-name="{{ row.name }}" {% if row.proponent %}data-proponent="{{ row.proponent.pk }}"{% endif %}>
+          <legend>{% if row.proponent %}{{ row.label }}{% else %}Rating{% endif %}</legend>
+          <div class="rating-line">
+          <div class="scale">
+            {% for s in c.scale %}
+            <label class="rate" title="{{ s.label }} ({{ s.n }}): {{ s.text }}">
+              <input type="radio" name="{{ row.name }}" value="{{ s.n }}" {% if row.value == s.n|stringformat:'s' %}checked{% endif %} {% if locked %}disabled{% endif %}>
+              <span><b>{{ s.n }}</b><small>{{ s.label }}</small></span>
+            </label>
+            {% endfor %}
+          </div>
+          <output class="row-score" data-for="{{ row.name }}">—</output>
+          </div>
+        </fieldset>
+        {% endfor %}
+      </div>
+      {% endwith %}
+      {% endfor %}
+    </section>
+    {% endfor %}
+
+    <section class="section-block comments-block">
+      <h2 class="section-title"><label for="id_comments">{{ form.comments.label }}</label></h2>
+      <textarea name="comments" id="id_comments" rows="6" class="comments" {% if locked %}readonly{% endif %} placeholder="Revisions the group must make, observations, recommendations…">{{ form.comments.value|default:'' }}</textarea>
+    </section>
+
+    {% if not locked %}
+    <div class="form-actions eval-actions">
+      {% if was_submitted %}
+      <button type="submit" name="action" value="submit" class="btn btn-primary" id="submit-btn" data-resubmit="1">Save changes</button>
+      <a class="btn btn-ghost" href="{% url 'defense:results' defense.pk %}">Cancel</a>
+      <span class="muted small">Every item must stay rated. Your updated scores replace the ones you submitted.</span>
+      {% else %}
+      <button type="submit" name="action" value="draft" class="btn" formnovalidate>Save draft</button>
+      <button type="submit" name="action" value="submit" class="btn btn-primary" id="submit-btn">Submit evaluation</button>
+      <span class="muted small">Draft saves partial ratings. Submitting requires every rating; you can still edit it until scoring is closed.</span>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  <aside class="eval-summary" aria-live="polite">
+    <div class="card summary-card">
+      <h2 class="card-title">Your scores</h2>
+      <table class="score-table">
+        <tr><th>A. System</th><td id="sum-A">{{ score.A|fmt2 }}</td></tr>
+        <tr><th>B. Manuscript</th><td id="sum-B">{{ score.B|fmt2 }}</td></tr>
+        <tr><th>C. Oral defense <span class="muted small">(avg)</span></th><td id="sum-C">{{ score.C|fmt2 }}</td></tr>
+        <tr class="final-row"><th>Final</th><td id="sum-final">{{ score.final|fmt2 }}</td></tr>
+      </table>
+      <div id="sum-verdict" class="verdict-pill {% if score.complete %}{{ score.verdict|verdict_class }}{% endif %}">
+        {% if score.complete %}{{ score.verdict_label }}{% else %}{{ score.missing }} rating{{ score.missing|pluralize }} left{% endif %}
+      </div>
+      <p id="sum-note">{% if locked %}Final as submitted.{% else %}Provisional until you save; the server recomputes it.{% endif %}</p>
+      {% if proponents|length > 0 %}
+      <table class="score-table per-prop">
+        <thead><tr><th>Proponent</th><th>C</th><th>FINAL</th></tr></thead>
+        <tbody>
+        {% for ps in score.proponents %}
+          <tr data-proponent-row="{{ ps.proponent.pk }}"><td>{{ ps.proponent.full_name }}</td><td class="p-c">{{ ps.C|fmt2 }}</td><td class="p-final">{{ ps.final|fmt2 }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+    </div>
+  </aside>
+</form>
+
+<div class="mobile-bar no-print" id="mobile-bar">
+  <span>Final <strong id="bar-final">{{ score.final|fmt2 }}</strong></span>
+  <span id="bar-verdict" class="small">{% if score.complete %}{{ score.verdict_label }}{% else %}{{ score.missing }} left{% endif %}</span>
+</div>
+{{ verdict_labels|json_script:"verdict-labels" }}
+{% endblock %}
+{% block scripts %}<script src="{% static 'js/evaluate.js' %}"></script>{% endblock %}

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Scoring settings · Capstone Defense Scoring{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Scoring settings</h1>
+    <p class="muted">Score bands for the Panel's Decision.</p>
+  </div>
+</div>
+
+<form method="post" class="stack narrow" novalidate>
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div class="msg msg-error">{{ form.non_field_errors }}</div>{% endif %}
+
+  <section class="card">
+    <h2 class="card-title">Decision cutoffs</h2>
+    <p class="muted small">Each panelist's FINAL (A + B + C) is rounded to 2 decimals and compared with ≥.
+      Below the last cutoff is FAILED. The panel's decision is the result at least 2 of the 3 panelists agree on.
+      Cutoffs must strictly decrease and stay within 1.00–5.00.</p>
+    <div class="grid-3">
+      {% for f in form %}
+      <label class="field">
+        <span>{{ f.label }}</span>
+        {{ f }}
+        {{ f.errors }}
+      </label>
+      {% endfor %}
+    </div>
+  </section>
+
+  <div class="form-actions">
+    <button type="submit" class="btn btn-primary">Save settings</button>
+  </div>
+</form>
+{% endblock %}

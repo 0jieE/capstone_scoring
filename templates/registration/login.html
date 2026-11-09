@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Log in · ITE Capstone Defense Scoring{% endblock %}
+{% block content %}
+<div class="login-wrap">
+  <div class="card login-card">
+    <div class="login-head">
+      <span class="ite-mark" aria-hidden="true">ITE</span>
+      <div>
+        <strong>Capstone Defense Scoring</strong>
+        <span>{{ INSTITUTION.department|title }}</span>
+      </div>
+    </div>
+    <div class="login-body">
+      <h1>Panel sign-in</h1>
+      <p class="muted">Use the account the Research Coordinator gave you.</p>
+
+      {% if form.non_field_errors %}
+        <div class="msg msg-error">Your username and password didn't match. Please try again.</div>
+      {% endif %}
+      {% if next and user.is_authenticated %}
+        <div class="msg msg-warning">Your account doesn't have access to that page.</div>
+      {% endif %}
+
+      <form method="post" action="{% url 'login' %}" class="stack">
+        {% csrf_token %}
+        <label class="field">
+          <span>Username</span>
+          <input type="text" name="username" autocomplete="username" autocapitalize="none" required autofocus
+                 value="{{ form.username.value|default:'' }}">
+        </label>
+        <label class="field">
+          <span>Password</span>
+          <input type="password" name="password" autocomplete="current-password" required>
+        </label>
+        <input type="hidden" name="next" value="{{ next }}">
+        <button type="submit" class="btn btn-primary btn-block">Log in</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

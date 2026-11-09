@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% load defense_extras %}
+{% block title %}Evaluation form · {{ assignment.panelist.display_name }}{% endblock %}
+{% block body_class %}print-page{% endblock %}
+{% block main_class %}sheet{% endblock %}
+{% block content %}
+<div class="print-toolbar no-print">
+  <a class="btn btn-ghost" href="{% if assignment.panelist.user_id == user.pk %}{% url 'defense:evaluate' assignment.pk %}{% else %}{% url 'defense:results' defense.pk %}{% endif %}">← Back</a>
+  <button type="button" class="btn btn-primary" onclick="window.print()">Print</button>
+  {% if not evaluation.submitted %}<span class="chip chip-warn">{% if evaluation %}Draft, not yet submitted{% else %}Not started{% endif %}</span>{% endif %}
+</div>
+
+<div class="inst-block">
+  <div class="inst-name">{{ INSTITUTION.name }}</div>
+  <div class="inst-sub">{{ INSTITUTION.address }}</div>
+  <div class="inst-dept">{{ INSTITUTION.department }}</div>
+  <div class="form-title">{{ INSTITUTION.form_title }}</div>
+</div>
+
+<table class="info-table">
+  <tr><th>Project title</th><td><strong>{{ defense.title }}</strong></td></tr>
+  <tr><th>Proponents</th><td>{% for p in proponents %}{{ forloop.counter }}. {{ p.full_name }}{% if not forloop.last %}&nbsp;&nbsp; {% endif %}{% endfor %}</td></tr>
+  <tr><th>Panelist</th><td>{{ assignment.panelist.display_name }} ({{ assignment.get_role_display }})</td></tr>
+  <tr><th>Schedule</th><td>{{ defense.schedule_date|date:"F j, Y" }}{% if defense.schedule_time %}, {{ defense.schedule_time|time:"g:i A" }}{% endif %}{% if defense.venue %}, {{ defense.venue }}{% endif %}</td></tr>
+</table>
+
+<p class="print-scale">Scale: 5 = Excellence, 4 = Very Good, 3 = Good (Meets Expectations), 2 = Fair (Needs Improvement), 1 = Poor. Weighted score = Rating × Weight.</p>
+
+<table class="print-table rubric-print">
+  <colgroup><col class="c-crit"><col class="c-desc"><col class="c-desc"><col class="c-desc"><col class="c-desc"><col class="c-desc"><col class="c-w"><col class="c-r"><col class="c-s"></colgroup>
+  <thead>
+    <tr><th>Criteria</th><th>Excellence<br>(5)</th><th>Very Good<br>(4)</th><th>Good<br>(3)</th><th>Fair<br>(2)</th><th>Poor<br>(1)</th><th class="num">Weight</th><th class="num">Rating</th><th class="num">Score</th></tr>
+  </thead>
+  <tbody>
+  {% for line in lines %}
+    {% with c=line.criterion %}
+    {% ifchanged c.section %}
+      <tr class="sec-row"><td colspan="6">{{ c.get_section_display }}</td>
+        <td class="num" colspan="2">Subtotal</td>
+        <td class="num"><strong>{% if c.section == "A" %}{{ score.A|fmt2 }}{% elif c.section == "B" %}{{ score.B|fmt2 }}{% else %}{{ score.C|fmt2 }}{% if proponents|length > 1 %}*{% endif %}{% endif %}</strong></td></tr>
+    {% endifchanged %}
+    <tr>
+      <td><strong>{{ c.number }}. {{ c.name }}</strong><div class="guide">{{ c.guide_question }}</div></td>
+      {% for s in c.scale %}<td class="desc-cell{% if line.rating == s.n %} picked{% endif %}">{{ s.text }}</td>{% endfor %}
+      <td class="num">{{ c.weight_percent|pct }}%</td>
+      {% if line.per_proponent %}
+        <td class="num">{% for cell in line.per_proponent %}<div class="pp">{{ forloop.counter }}: {{ cell.rating|default:"—" }}</div>{% endfor %}</td>
+        <td class="num">{% for cell in line.per_proponent %}<div class="pp">{{ cell.weighted|fmt2 }}</div>{% endfor %}</td>
+      {% else %}
+        <td class="num"><strong>{{ line.rating|default:"—" }}</strong></td>
+        <td class="num">{{ line.weighted|fmt2 }}</td>
+      {% endif %}
+    </tr>
+    {% endwith %}
+  {% endfor %}
+  </tbody>
+</table>
+{% if proponents|length > 1 %}<p class="print-note">* C is the average of the proponents' oral-defense scores. Numbers in the Rating column refer to the proponent list above.</p>{% endif %}
+
+<div class="print-two">
+  <table class="print-table summary-print">
+    <thead><tr><th>Proponent</th><th class="num">A</th><th class="num">B</th><th class="num">C</th><th class="num">FINAL</th></tr></thead>
+    <tbody>
+      {% for ps in score.proponents %}
+      <tr><td>{{ forloop.counter }}. {{ ps.proponent.full_name }}</td><td class="num">{{ score.A|fmt2 }}</td><td class="num">{{ score.B|fmt2 }}</td><td class="num">{{ ps.C|fmt2 }}</td><td class="num">{{ ps.final|fmt2 }}</td></tr>
+      {% endfor %}
+    </tbody>
+    <tfoot><tr><th>Group</th><td class="num">{{ score.A|fmt2 }}</td><td class="num">{{ score.B|fmt2 }}</td><td class="num">{{ score.C|fmt2 }}</td><td class="num"><strong>{{ score.final|fmt2 }}</strong></td></tr></tfoot>
+  </table>
+  <div class="print-decision">
+    <div class="print-final">FINAL SCORE: <strong>{{ score.final|fmt2 }}</strong></div>
+    {% if score.complete %}{% include "defense/_decision.html" with selected=score.verdict %}{% else %}{% include "defense/_decision.html" with selected=None %}{% endif %}
+  </div>
+</div>
+
+<h3 class="print-h">Required revisions / comments</h3>
+<div class="comment-box">{{ evaluation.comments|default:""|linebreaksbr }}</div>
+
+<div class="signatures single">
+  <div class="sig">
+    <div class="sig-name">{{ assignment.panelist.display_name }}</div>
+    <div class="sig-line">Signature Over Printed Name</div>
+    <div class="sig-role">{{ assignment.get_role_display }}</div>{% if evaluation.submitted_at %}<div class="sig-role">Submitted {{ evaluation.submitted_at|date:"M j, Y g:i A" }}</div>{% endif %}
+  </div>
+</div>
+{% endblock %}

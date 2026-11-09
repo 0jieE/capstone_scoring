@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}{% if panelist %}Edit panelist{% else %}New panelist{% endif %} · Capstone Defense Scoring{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>{% if panelist %}Edit {{ panelist.display_name }}{% else %}New panelist{% endif %}</h1>
+    <p class="muted">The name prints on forms as, e.g., “Engr. Jelmar L. Villaruel, LPT”.</p>
+  </div>
+</div>
+
+<form method="post" class="card stack narrow" novalidate>
+  <h2 class="card-title">Account details</h2>
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div class="msg msg-error">{{ form.non_field_errors }}</div>{% endif %}
+  <div class="grid-name">
+    {% for f in form %}
+      {% if f.name in "prefix first_name last_name suffix" %}
+      <label class="field">
+        <span>{{ f.label }}</span>
+        {{ f }}
+        {% if f.help_text %}<small class="help">{{ f.help_text }}</small>{% endif %}
+        {{ f.errors }}
+      </label>
+      {% endif %}
+    {% endfor %}
+  </div>
+  <div class="grid-2">
+    <label class="field">
+      <span>Username</span>
+      {{ form.username }}
+      {{ form.username.errors }}
+    </label>
+    <label class="field">
+      <span>Password</span>
+      {{ form.password }}
+      <small class="help">{{ form.password.help_text }}</small>
+      {{ form.password.errors }}
+    </label>
+  </div>
+  <label class="check">{{ form.can_manage }} <span><strong>Can manage</strong><br><span class="muted small">{{ form.can_manage.help_text }}</span></span></label>
+  {% if panelist %}<label class="check">{{ form.is_active }} <span><strong>Active</strong><br><span class="muted small">Inactive accounts can't sign in or be put on new panels.</span></span></label>{% endif %}
+  <div class="form-actions">
+    <button type="submit" class="btn btn-primary">Save</button>
+    <a class="btn btn-ghost" href="{% url 'defense:panelist_list' %}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% load defense_extras %}
+{% block title %}Defenses · ITE Capstone Defense Scoring{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Final defenses</h1>
+    <p class="muted">{% if is_manager %}Every scheduled defense, newest first.{% else %}Defenses where you sit on the panel.{% endif %}</p>
+  </div>
+  {% if is_manager %}<a class="btn btn-primary" href="{% url 'defense:defense_create' %}">+ New defense</a>{% endif %}
+</div>
+
+{% if not items %}
+  <div class="card empty">
+    {% if is_manager %}
+      No defenses yet. <a href="{% url 'defense:defense_create' %}">Schedule the first defense</a>.
+    {% else %}
+      You are not on any defense panel yet. Ask the Research Coordinator to add you.
+    {% endif %}
+  </div>
+{% else %}
+<div class="card docket">
+{% for it in items %}
+  {% with d=it.defense %}
+  <article class="docket-row{% if not d.is_open %} is-closed{% endif %}">
+    <div class="when" aria-label="{{ d.schedule_date|date:'l, F j, Y' }}{% if d.schedule_time %}, {{ d.schedule_time|time:'g:i A' }}{% endif %}">
+      <span class="when-month">{{ d.schedule_date|date:"M Y" }}</span>
+      <span class="when-day">{{ d.schedule_date|date:"j" }}</span>
+      <span class="when-time">{% if d.schedule_time %}{{ d.schedule_time|time:"g:i A" }}{% else %}{{ d.schedule_date|date:"l" }}{% endif %}</span>
+    </div>
+
+    <div class="docket-main">
+      <h2 class="docket-title">
+        {% if is_manager or it.mine %}<a href="{% url 'defense:results' d.pk %}">{{ d.title }}</a>{% else %}{{ d.title }}{% endif %}
+      </h2>
+      <p class="meta docket-meta">
+        {% if d.venue %}<span>{{ d.venue }}</span>{% endif %}
+        {% if not d.is_open %}<span class="chip chip-closed">Scoring closed</span>{% endif %}
+      </p>
+      <p class="docket-students"><span class="muted">Proponents:</span>
+        {% for p in it.proponents %}{{ p.full_name }}{% if not forloop.last %}, {% endif %}{% empty %}<em>none yet</em>{% endfor %}</p>
+      <ul class="panel-status" aria-label="Panel">
+        {% for row in it.progress %}
+          <li><span class="dot {{ row.status|status_class }}" aria-hidden="true"></span>
+            <span class="who-role">{{ row.assignment.get_role_display }}</span>
+            <span>{{ row.assignment.panelist.display_name }}</span>
+            <span class="who-state">{{ row.label }}</span></li>
+        {% empty %}
+          <li class="muted">No panel assigned yet.</li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <div class="docket-side">
+      <div class="docket-progress">
+        <span class="chip {% if it.done %}chip-ok{% elif it.submitted %}chip-warn{% else %}chip-muted{% endif %}">{{ it.submitted }}/{{ it.total }} submitted</span>
+      </div>
+      {% if it.mine %}
+        {% if not d.is_open %}
+          <a class="btn{% if it.my_status == 'submitted' %} btn-done{% endif %}" href="{% url 'defense:evaluate' it.mine.pk %}">{% if it.my_status == "submitted" %}✓ Submitted{% else %}View my form{% endif %}</a>
+        {% elif it.my_status == "submitted" %}
+          <a class="btn btn-done" href="{% url 'defense:evaluate' it.mine.pk %}">✓ Edit my scores</a>
+        {% elif it.my_status == "draft" %}
+          <a class="btn btn-primary" href="{% url 'defense:evaluate' it.mine.pk %}">Continue</a>
+        {% else %}
+          <a class="btn btn-primary" href="{% url 'defense:evaluate' it.mine.pk %}">Score now</a>
+        {% endif %}
+      {% endif %}
+      {% if is_manager or it.mine %}
+        <a class="btn" href="{% url 'defense:results' d.pk %}">{% if it.done %}Results{% else %}Status{% endif %}</a>
+      {% endif %}
+      {% if is_manager %}
+        <div class="docket-tools">
+          <a class="btn btn-small btn-ghost" href="{% url 'defense:defense_edit' d.pk %}">Edit</a>
+          <form method="post" action="{% url 'defense:defense_toggle' d.pk %}">
+            {% csrf_token %}
+            <button class="btn btn-small btn-ghost" type="submit">{% if d.is_open %}Close scoring{% else %}Reopen scoring{% endif %}</button>
+          </form>
+          <form method="post" action="{% url 'defense:defense_delete' d.pk %}"
+                onsubmit="return confirm('Delete the defense “{{ d.title|escapejs }}”?\n\nThis also deletes its students, panel and all scores{% if it.submitted %} ({{ it.submitted }} submitted evaluation{{ it.submitted|pluralize }}){% endif %}. This cannot be undone.');">
+            {% csrf_token %}
+            <button class="btn btn-small btn-danger" type="submit">Delete</button>
+          </form>
+        </div>
+      {% endif %}
+    </div>
+  </article>
+  {% endwith %}
+{% endfor %}
+</div>
+{% endif %}
+{% endblock %}

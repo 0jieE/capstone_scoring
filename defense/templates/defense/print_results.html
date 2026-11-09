@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% load defense_extras %}
+{% block title %}Summary sheet · {{ defense.title|truncatechars:40 }}{% endblock %}
+{% block body_class %}print-page{% endblock %}
+{% block main_class %}sheet{% endblock %}
+{% block content %}
+<div class="print-toolbar no-print">
+  <a class="btn btn-ghost" href="{% url 'defense:results' defense.pk %}">← Back to results</a>
+  {% if result.complete %}<button type="button" class="btn btn-primary" onclick="window.print()">Print</button>{% endif %}
+</div>
+
+<div class="inst-block">
+  <div class="inst-name">{{ INSTITUTION.name }}</div>
+  <div class="inst-sub">{{ INSTITUTION.address }}</div>
+  <div class="inst-dept">{{ INSTITUTION.department }}</div>
+  <div class="form-title">{{ INSTITUTION.form_title }}</div>
+  <div class="form-subtitle">SUMMARY OF RATINGS</div>
+</div>
+
+<table class="info-table">
+  <tr><th>Project title</th><td><strong>{{ defense.title }}</strong></td></tr>
+  <tr><th>Proponents</th><td>{% for p in result.proponents %}{{ p.full_name }}{% if not forloop.last %}; {% endif %}{% endfor %}</td></tr>
+  <tr><th>Schedule</th><td>{{ defense.schedule_date|date:"F j, Y" }}{% if defense.schedule_time %}, {{ defense.schedule_time|time:"g:i A" }}{% endif %}{% if defense.venue %}, {{ defense.venue }}{% endif %}</td></tr>
+</table>
+
+{% if not result.complete %}
+  <div class="msg msg-warning">The summary sheet is available once all 3 evaluations are submitted ({{ result.submitted_count }}/{{ result.total }} so far).</div>
+{% else %}
+{% with d=result.decision %}
+<h3 class="print-h">Grade computation (per panelist)</h3>
+<table class="print-table">
+  <thead>
+    <tr><th>Panelist</th><th>Role</th><th class="num">A. System (45%)</th><th class="num">B. Manuscript (20%)</th><th class="num">C. Oral (35%)</th><th class="num">FINAL (A+B+C)</th><th>Result</th></tr>
+  </thead>
+  <tbody>
+  {% for row in result.rows %}
+    <tr><td>{{ row.assignment.panelist.display_name }}</td><td>{{ row.assignment.get_role_display }}</td>
+      <td class="num">{{ row.score.A|fmt2 }}</td><td class="num">{{ row.score.B|fmt2 }}</td>
+      <td class="num">{{ row.score.C|fmt2 }}</td><td class="num"><strong>{{ row.score.final|fmt2 }}</strong></td>
+      <td>{{ row.score.verdict_label }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% if result.proponents|length > 1 %}<p class="print-note">C is the average of the students' oral-defense scores, as written on the paper form.</p>{% endif %}
+
+<h3 class="print-h">Per student (A + B + the student's own C)</h3>
+<table class="print-table">
+  <thead><tr><th>Student</th>{% for row in result.rows %}<th class="num">{{ row.assignment.get_role_display }}</th>{% endfor %}<th>Decision (2 of 3)</th></tr></thead>
+  <tbody>
+  {% for pd in d.proponents %}
+    <tr><td>{{ pd.proponent.full_name }}</td>
+      {% for ps in pd.scores %}<td class="num">{{ ps.final|fmt2 }} ({{ ps.verdict|verdict_short }})</td>{% endfor %}
+      <td><strong>{{ pd.decision.verdict_label }}</strong>{% if not pd.decision.majority %} *{% endif %}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<div class="print-decision">
+  <div class="print-final">PANEL'S DECISION: <strong>{{ d.verdict_label }}</strong>{% if not d.group.majority %} *{% endif %} ({{ d.group.summary }})</div>
+  {% include "defense/_decision.html" with selected=d.verdict %}
+</div>
+{% if d.has_split %}<p class="print-note">* No 2-of-3 agreement: the middle result is shown and must be confirmed by the panel.</p>{% endif %}
+
+<h3 class="print-h">Required revisions / comments</h3>
+{% for row in result.rows %}
+  <div class="comment-block">
+    <div class="comment-who">{{ row.assignment.panelist.display_name }} ({{ row.assignment.get_role_display }})</div>
+    <div class="comment-text">{{ row.evaluation.comments|default:"(no comments)"|linebreaksbr }}</div>
+  </div>
+{% endfor %}
+
+<div class="signatures">
+  {% for row in result.rows %}
+  <div class="sig">
+    <div class="sig-name">{{ row.assignment.panelist.display_name }}</div>
+    <div class="sig-line">Signature Over Printed Name</div>
+    <div class="sig-role">{{ row.assignment.get_role_display }}</div>
+  </div>
+  {% endfor %}
+</div>
+<p class="print-foot">Generated {% now "F j, Y g:i A" %} by the ITE Capstone Defense Scoring System</p>
+{% endwith %}
+{% endif %}
+{% endblock %}

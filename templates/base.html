@@ -1,0 +1,56 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Capstone Defense Scoring{% endblock %}</title>
+  <link rel="preload" href="{% static 'fonts/archivo-latin-wdth-normal.woff2' %}" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  {% with here=request.resolver_match.url_name %}
+  <header class="topbar no-print">
+    <div class="topbar-inner">
+      <a class="brand" href="{% if user.is_authenticated %}{% url 'defense:dashboard' %}{% else %}{% url 'login' %}{% endif %}">
+        <span class="ite-mark" aria-hidden="true">ITE</span>
+        <span class="brand-text">
+          <strong>ITE Department</strong>
+          <small>Capstone Defense Scoring</small>
+        </span>
+      </a>
+      {% if user.is_authenticated %}
+      <nav class="nav" aria-label="Main">
+        <a href="{% url 'defense:dashboard' %}" class="{% if here == 'dashboard' %}is-active{% endif %}"{% if here == 'dashboard' %} aria-current="page"{% endif %}>Defenses</a>
+        {% if user.is_staff %}
+          <a href="{% url 'defense:defense_create' %}" class="{% if here == 'defense_create' %}is-active{% endif %}">New defense</a>
+          <a href="{% url 'defense:panelist_list' %}" class="{% if here == 'panelist_list' or here == 'panelist_create' or here == 'panelist_edit' %}is-active{% endif %}">Panelists</a>
+          <a href="{% url 'defense:scoring_settings' %}" class="{% if here == 'scoring_settings' %}is-active{% endif %}">Settings</a>
+          {% if user.is_superuser %}<a href="{% url 'admin:index' %}">Admin</a>{% endif %}
+        {% endif %}
+        <span class="nav-end">
+          <span class="nav-user" title="Signed in as {{ user.username }}">{{ user.panelist.display_name|default:user.username }}</span>
+          <form method="post" action="{% url 'logout' %}" class="inline">
+            {% csrf_token %}
+            <button type="submit" class="nav-logout">Log out</button>
+          </form>
+        </span>
+      </nav>
+      {% endif %}
+    </div>
+  </header>
+  {% endwith %}
+
+  {% if messages %}
+  <div class="messages no-print">
+    {% for message in messages %}
+      <div class="msg msg-{{ message.tags|default:'info' }}" role="status">{{ message }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <main class="{% block main_class %}container{% endblock %}">{% block content %}{% endblock %}</main>
+
+  <footer class="footer no-print">{{ INSTITUTION.department|title }}</footer>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

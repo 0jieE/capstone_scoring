@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}{% if defense %}Edit defense{% else %}New defense{% endif %} · Capstone Defense Scoring{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>{% if defense %}Edit defense{% else %}New defense{% endif %}</h1>
+    <p class="muted">Defense details, proponents and the three-person panel.</p>
+  </div>
+</div>
+
+<form method="post" class="stack" novalidate>
+  {% csrf_token %}
+  {% if form.non_field_errors or panel.non_field_errors or formset.non_form_errors %}
+    <div class="msg msg-error">
+      {{ form.non_field_errors }}{{ panel.non_field_errors }}{{ formset.non_form_errors }}
+    </div>
+  {% endif %}
+
+  <section class="card">
+    <h2 class="card-title">Defense information</h2>
+    <div class="grid-2">
+      <label class="field span-2">
+        <span>{{ form.title.label }}</span>
+        {{ form.title }}
+        {{ form.title.errors }}
+      </label>
+      <label class="field">
+        <span>Schedule date</span>
+        {{ form.schedule_date }}
+        {{ form.schedule_date.errors }}
+      </label>
+      <label class="field">
+        <span>Schedule time</span>
+        {{ form.schedule_time }}
+        {{ form.schedule_time.errors }}
+      </label>
+      <label class="field span-2">
+        <span>Venue</span>
+        {{ form.venue }}
+        {{ form.venue.errors }}
+      </label>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2 class="card-title">Proponents <span class="muted small">1 to {{ max_proponents }} students</span></h2>
+    {{ formset.management_form }}
+    <ol class="proponent-rows" id="proponent-rows">
+      {% for f in formset %}
+        <li class="proponent-row">
+          {{ f.id }}
+          <div class="proponent-line">
+          <label class="field grow">
+            <span class="sr-only">Proponent {{ forloop.counter }}</span>
+            {{ f.full_name }}
+          </label>
+          {% if f.instance.pk %}
+            <label class="check small">{{ f.DELETE }} Remove</label>
+          {% endif %}
+          </div>
+          {{ f.full_name.errors }}
+        </li>
+      {% endfor %}
+    </ol>
+    <template id="proponent-template">
+      <li class="proponent-row">
+        {{ formset.empty_form.id }}
+        <label class="field grow">
+          <span class="sr-only">Proponent</span>
+          {{ formset.empty_form.full_name }}
+        </label>
+      </li>
+    </template>
+    <button type="button" class="btn btn-small" id="add-proponent" data-max="{{ max_proponents }}">+ Add proponent</button>
+  </section>
+
+  <section class="card">
+    <h2 class="card-title">Panel</h2>
+    <p class="muted small">Choose three different people. Each panelist scores the group on their own form; the panel's decision is the result at least 2 of the 3 agree on.
+      {% if defense %}Changing who holds a role deletes that role's previous evaluation.{% endif %}</p>
+    <div class="panel-rows">
+      {% for label, who in panel.role_rows %}
+        <label class="field">
+          <span>{{ label }}</span>
+          {{ who }}
+          {{ who.errors }}
+        </label>
+      {% endfor %}
+    </div>
+  </section>
+
+  <div class="form-actions">
+    <button type="submit" class="btn btn-primary">Save defense</button>
+    <a class="btn btn-ghost" href="{% url 'defense:dashboard' %}">Cancel</a>
+  </div>
+</form>
+
+{% if defense %}
+<section class="card danger-zone">
+  <h2 class="card-title">Delete this defense</h2>
+  <p class="muted small">Removes the defense, its students, its panel and every rating and comment the panelists entered. This cannot be undone.</p>
+  <form method="post" action="{% url 'defense:defense_delete' defense.pk %}"
+        onsubmit="return confirm('Delete the defense “{{ defense.title|escapejs }}” and all of its scores?\n\nThis cannot be undone.');">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-danger">Delete defense</button>
+  </form>
+</section>
+{% endif %}
+{% endblock %}
+{% block scripts %}<script src="{% static 'js/defense_form.js' %}"></script>{% endblock %}
